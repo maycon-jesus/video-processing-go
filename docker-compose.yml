@@ -1,0 +1,13 @@
+services:
+  app:
+      build:
+        context: .
+        dockerfile: ./Dockerfile
+      restart: on-failure
+      cpu_count: 22
+      volumes:
+        - './videos:/go/src/gocv.io/x/gocv/'
+      develop:
+        watch:
+          - action: rebuild
+            path: main.go
