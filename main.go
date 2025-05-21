@@ -99,25 +99,70 @@ func main() {
 
 	fmt.Println("→ Lendo", caminhoVideo)
 	pixels := carregarVideo(caminhoVideo)
-	pixels = pixels[480:504]
+	//pixels = pixels[480:504]
 
 	if len(pixels) > 0 {
 		fmt.Printf("Frames: %d   Resolução: %dx%d\n", len(pixels), len(pixels[0][0]), len(pixels[0]))
 	}
 
-	for i, frame := range pixels {
-		var frameCopy [][]uint8
-		fmt.Println("Frame ", i)
-		for y, row := range frame {
-			frameCopy = append(frameCopy, []uint8{})
-			for x, _ := range row {
-				radius := internal.GetPixelRadius(frame, y, x, 1)
-				//radius.ApplyMedianMask()
-				frameCopy[y] = append(frameCopy[y], radius.Pixels[radius.CenterY][radius.CenterX])
+	filaProcessamento := make(chan internal.FrameIndentifier)
+	filaFramesProcessados := make(chan internal.FrameIndentifier, len(pixels))
+
+	go func() {
+		for i, frame := range pixels {
+			filaProcessamento <- internal.FrameIndentifier{
+				Id:     i,
+				Pixels: frame,
 			}
 		}
-		pixels[i] = frameCopy
+		close(filaProcessamento)
+	}()
+
+	go func() {
+		for range 22 {
+			go func() {
+				for {
+					frame, ok := <-filaProcessamento
+					if !ok {
+						break
+					}
+					var frameCopy internal.Frame
+					fmt.Println("Frame ", frame.Id)
+					for y, row := range frame.Pixels {
+						frameCopy = append(frameCopy, []uint8{})
+						for x, _ := range row {
+							radius := internal.GetPixelRadius(frame.Pixels, y, x, 1)
+							radius.ApplyMedianMask()
+							frameCopy[y] = append(frameCopy[y], radius.Pixels[radius.CenterY][radius.CenterX])
+						}
+					}
+					frame.Pixels = frameCopy
+					filaFramesProcessados <- frame
+				}
+			}()
+		}
+	}()
+
+	for range len(pixels) {
+		frame := <-filaFramesProcessados
+		fmt.Println("copiando frame", frame.Id)
+		pixels[frame.Id] = frame.Pixels
 	}
+	close(filaFramesProcessados)
+
+	//for i, frame := range pixels {
+	//	var frameCopy [][]uint8
+	//	fmt.Println("Frame ", i)
+	//	for y, row := range frame {
+	//		frameCopy = append(frameCopy, []uint8{})
+	//		for x, _ := range row {
+	//			radius := internal.GetPixelRadius(frame, y, x, 1)
+	//			radius.ApplyMedianMask()
+	//			frameCopy[y] = append(frameCopy[y], radius.Pixels[radius.CenterY][radius.CenterX])
+	//		}
+	//	}
+	//	pixels[i] = frameCopy
+	//}
 
 	fmt.Println("→ Gravando", caminhoSaida)
 	gravarVideo(pixels, caminhoSaida, fps)
