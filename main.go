@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"gocv.io/x/gocv"
+	"video-processor/internal"
 )
 
 func carregarVideo(caminho string) [][][]uint8 {
@@ -91,18 +92,34 @@ func gravarVideo(frames [][][]uint8, caminho string, fps float64) {
 }
 
 func main() {
-	caminhoVideo := "./video.mp4"
-	caminhoSaida := "./video2.mp4"
-	fps := 21.0
+	fmt.Println("ola mundo")
+	caminhoVideo := "./videos/video.mp4"
+	caminhoSaida := "./videos/video2.mp4"
+	fps := 24.0
 
 	fmt.Println("→ Lendo", caminhoVideo)
 	pixels := carregarVideo(caminhoVideo)
-	pixels = pixels[500:600]
+	pixels = pixels[480:504]
 
 	if len(pixels) > 0 {
 		fmt.Printf("Frames: %d   Resolução: %dx%d\n", len(pixels), len(pixels[0][0]), len(pixels[0]))
-		fmt.Println("→ Gravando", caminhoSaida)
-		gravarVideo(pixels, caminhoSaida, fps)
-		fmt.Println("Concluído!")
 	}
+
+	for i, frame := range pixels {
+		var frameCopy [][]uint8
+		fmt.Println("Frame ", i)
+		for y, row := range frame {
+			frameCopy = append(frameCopy, []uint8{})
+			for x, _ := range row {
+				radius := internal.GetPixelRadius(frame, y, x, 1)
+				//radius.ApplyMedianMask()
+				frameCopy[y] = append(frameCopy[y], radius.Pixels[radius.CenterY][radius.CenterX])
+			}
+		}
+		pixels[i] = frameCopy
+	}
+
+	fmt.Println("→ Gravando", caminhoSaida)
+	gravarVideo(pixels, caminhoSaida, fps)
+	fmt.Println("Concluído!")
 }

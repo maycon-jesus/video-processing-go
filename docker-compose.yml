@@ -6,8 +6,10 @@ services:
       restart: on-failure
       cpu_count: 22
       volumes:
-        - './videos:/go/src/gocv.io/x/gocv/'
+        - '.:/go/src/gocv.io/x/gocv/'
+      entrypoint: "sleep infinity"
       develop:
         watch:
-          - action: rebuild
+          - action: sync
+            target: ./
             path: main.go
