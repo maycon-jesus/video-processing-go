@@ -1,6 +1,7 @@
 package internal
 
 type Frame = [][]uint8
+type VideoFrames = []Frame
 
 type FrameIndentifier struct {
 	Id     int

@@ -99,7 +99,7 @@ func main() {
 
 	fmt.Println("→ Lendo", caminhoVideo)
 	pixels := carregarVideo(caminhoVideo)
-	//pixels = pixels[480:504]
+	pixels = pixels[480:620]
 
 	if len(pixels) > 0 {
 		fmt.Printf("Frames: %d   Resolução: %dx%d\n", len(pixels), len(pixels[0][0]), len(pixels[0]))
@@ -127,7 +127,7 @@ func main() {
 						break
 					}
 					var frameCopy internal.Frame
-					fmt.Println("Frame ", frame.Id)
+					// fmt.Println("Frame ", frame.Id)
 					for y, row := range frame.Pixels {
 						frameCopy = append(frameCopy, []uint8{})
 						for x, _ := range row {
@@ -145,10 +145,12 @@ func main() {
 
 	for range len(pixels) {
 		frame := <-filaFramesProcessados
-		fmt.Println("copiando frame", frame.Id)
+		// fmt.Println("copiando frame", frame.Id)
 		pixels[frame.Id] = frame.Pixels
 	}
 	close(filaFramesProcessados)
+
+	internal.TimeTravaler(pixels, 10, 3)
 
 	//for i, frame := range pixels {
 	//	var frameCopy [][]uint8
