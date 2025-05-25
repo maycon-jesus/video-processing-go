@@ -2,8 +2,9 @@ package main
 
 import (
 	"fmt"
-	"gocv.io/x/gocv"
 	"video-processor/internal"
+
+	"gocv.io/x/gocv"
 )
 
 func carregarVideo(caminho string) [][][]uint8 {
@@ -99,7 +100,7 @@ func main() {
 
 	fmt.Println("→ Lendo", caminhoVideo)
 	pixels := carregarVideo(caminhoVideo)
-	pixels = pixels[480:620]
+	// pixels = pixels[480:620]
 
 	if len(pixels) > 0 {
 		fmt.Printf("Frames: %d   Resolução: %dx%d\n", len(pixels), len(pixels[0][0]), len(pixels[0]))
@@ -127,11 +128,11 @@ func main() {
 						break
 					}
 					var frameCopy internal.Frame
-					// fmt.Println("Frame ", frame.Id)
+					fmt.Println("Frame ", frame.Id)
 					for y, row := range frame.Pixels {
 						frameCopy = append(frameCopy, []uint8{})
 						for x, _ := range row {
-							radius := internal.GetPixelRadius(frame.Pixels, y, x, 1)
+							radius := internal.GetPixelRadius(frame.Pixels, y, x, 2)
 							radius.ApplyMedianMask()
 							frameCopy[y] = append(frameCopy[y], radius.Pixels[radius.CenterY][radius.CenterX])
 						}
@@ -150,7 +151,10 @@ func main() {
 	}
 	close(filaFramesProcessados)
 
-	internal.TimeTravaler(pixels, 10, 3)
+	for frameId := range len(pixels) {
+		internal.TimeTravaler(pixels, frameId, 7)
+		fmt.Println("Frame ", frameId)
+	}
 
 	//for i, frame := range pixels {
 	//	var frameCopy [][]uint8
