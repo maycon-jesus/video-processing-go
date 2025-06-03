@@ -34,6 +34,50 @@ func isEdgePixel(videoFrames VideoFrames, currentFrame, line, pixel int) bool {
 	return gradient > 20 // Threshold para detectar bordas
 }
 
+func isNoise(values []uint8, current uint8, variance float64) bool {
+	if len(values) < 3 {
+		return false
+	}
+
+	// Contar quantos valores históricos são similares entre si
+	similarCount := 0
+	threshold := uint8(3)
+
+	for i := 0; i < len(values)-1; i++ {
+		for j := i + 1; j < len(values); j++ {
+			diff := int(values[i]) - int(values[j])
+			if diff < 0 {
+				diff = -diff
+			}
+			if uint8(diff) <= threshold {
+				similarCount++
+			}
+		}
+	}
+
+	// Se a maioria dos valores históricos são similares,
+	// mas o atual é muito diferente, provavelmente é ruído
+	totalPairs := len(values) * (len(values) - 1) / 2
+	stabilityRatio := float64(similarCount) / float64(totalPairs)
+
+	if stabilityRatio > 0.6 { // 60% dos valores históricos são estáveis
+		// Verificar se o valor atual destoa
+		sort.Slice(values, func(i, j int) bool {
+			return values[i] < values[j]
+		})
+		median := values[len(values)/2]
+
+		currentDiff := int(current) - int(median)
+		if currentDiff < 0 {
+			currentDiff = -currentDiff
+		}
+
+		return uint8(currentDiff) > 8 // Valor atual muito diferente da mediana
+	}
+
+	return false
+}
+
 func TimeTravalerProcessLine(videoFrames VideoFrames, currentFrame int, previousFrames int, line int) []uint8 {
 	if currentFrame <= 2 {
 		return videoFrames[currentFrame][line]
@@ -57,28 +101,26 @@ func TimeTravalerProcessLine(videoFrames VideoFrames, currentFrame int, previous
 			tempValues[j] = videoFrames[frameStart+j][line][i]
 		}
 
-		med := median(tempValues)
 		variance := calculateVariance(tempValues)
 
-		// Filtro muito mais conservador
-		if variance < 25 {
-			alpha := 0.2 // Muito conservador
-			nLine[i] = uint8(alpha*float64(med) + (1-alpha)*float64(current))
-		} else {
-			// Região com movimento - seja ainda mais conservador
-			if currentFrame > 0 {
-				prev := videoFrames[currentFrame-1][line][i]
-				movement := math.Abs(float64(current) - float64(prev))
+		// Detector de ruído mais sofisticado
+		if isNoise(tempValues, current, variance) {
+			// É ruído - usar mediana dos valores históricos
+			sort.Slice(tempValues, func(i, j int) bool {
+				return tempValues[i] < tempValues[j]
+			})
+			median := tempValues[len(tempValues)/2]
 
-				if movement < 5 { // Muito restritivo
-					alpha := movement / 5.0 * 0.3 // Reduz ainda mais a influência
-					nLine[i] = uint8((1-alpha)*float64(current) + alpha*float64(med))
-				} else {
-					nLine[i] = current // Preserva movimento real
-				}
-			} else {
-				nLine[i] = current
-			}
+			// Correção suave do ruído
+			alpha := 0.7 // Mais agressivo para ruído
+			nLine[i] = uint8(alpha*float64(median) + (1-alpha)*float64(current))
+		} else if variance < 15 { // Região muito estável
+			median := median(tempValues)
+			alpha := 0.3 // Filtro moderado
+			nLine[i] = uint8(alpha*float64(median) + (1-alpha)*float64(current))
+		} else {
+			// Região com movimento - preservar
+			nLine[i] = current
 		}
 	}
 

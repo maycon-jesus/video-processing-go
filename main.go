@@ -135,7 +135,7 @@ func main() {
 					for y, row := range frame.Pixels {
 						frameCopy = append(frameCopy, []uint8{})
 						for x, _ := range row {
-							radius := internal.GetPixelRadius(frame.Pixels, y, x, 4)
+							radius := internal.GetPixelRadius(frame.Pixels, y, x, 1)
 							radius.ApplyMedianMask()
 							frameCopy[y] = append(frameCopy[y], radius.Pixels[radius.CenterY][radius.CenterX])
 						}
