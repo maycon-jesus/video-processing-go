@@ -96,11 +96,14 @@ func main() {
 	fmt.Println("ola mundo")
 	caminhoVideo := "./videos/video.mp4"
 	caminhoSaida := "./videos/video2.mp4"
+	caminhoSaidaOriginal := "./videos/video3.mp4"
 	fps := 24.0
 
 	fmt.Println("→ Lendo", caminhoVideo)
 	pixels := carregarVideo(caminhoVideo)
-	// pixels = pixels[480:620]
+	pixels = pixels[400:640]
+
+	gravarVideo(pixels, caminhoSaidaOriginal, fps)
 
 	if len(pixels) > 0 {
 		fmt.Printf("Frames: %d   Resolução: %dx%d\n", len(pixels), len(pixels[0][0]), len(pixels[0]))
@@ -132,7 +135,7 @@ func main() {
 					for y, row := range frame.Pixels {
 						frameCopy = append(frameCopy, []uint8{})
 						for x, _ := range row {
-							radius := internal.GetPixelRadius(frame.Pixels, y, x, 2)
+							radius := internal.GetPixelRadius(frame.Pixels, y, x, 4)
 							radius.ApplyMedianMask()
 							frameCopy[y] = append(frameCopy[y], radius.Pixels[radius.CenterY][radius.CenterX])
 						}
@@ -152,7 +155,7 @@ func main() {
 	close(filaFramesProcessados)
 
 	for frameId := range len(pixels) {
-		internal.TimeTravaler(pixels, frameId, 7)
+		internal.TimeTravaler(pixels, frameId, 23)
 		fmt.Println("Frame ", frameId)
 	}
 
