@@ -96,11 +96,14 @@ func main() {
 	fmt.Println("ola mundo")
 	caminhoVideo := "./videos/video.mp4"
 	caminhoSaida := "./videos/video2.mp4"
+	caminhoSaidaOriginal := "./videos/video3.mp4"
 	fps := 24.0
 
 	fmt.Println("→ Lendo", caminhoVideo)
 	pixels := carregarVideo(caminhoVideo)
-	// pixels = pixels[480:620]
+	pixels = pixels[400:640]
+
+	gravarVideo(pixels, caminhoSaidaOriginal, fps)
 
 	if len(pixels) > 0 {
 		fmt.Printf("Frames: %d   Resolução: %dx%d\n", len(pixels), len(pixels[0][0]), len(pixels[0]))
@@ -127,17 +130,26 @@ func main() {
 					if !ok {
 						break
 					}
-					var frameCopy internal.Frame
+					altura := len(frame.Pixels)
+					largura := len(frame.Pixels[0])
+					frameCopy := make(internal.Frame, altura)
 					fmt.Println("Frame ", frame.Id)
-					for y, row := range frame.Pixels {
-						frameCopy = append(frameCopy, []uint8{})
-						for x, _ := range row {
-							radius := internal.GetPixelRadius(frame.Pixels, y, x, 2)
-							radius.ApplyMedianMask()
-							frameCopy[y] = append(frameCopy[y], radius.Pixels[radius.CenterY][radius.CenterX])
-						}
+
+					for y := range frameCopy {
+						frameCopy[y] = make([]uint8, largura)
 					}
-					frame.Pixels = frameCopy
+
+					for range 10 {
+						for y, row := range frame.Pixels {
+							for x := range row {
+								radius := internal.GetPixelRadius(frame.Pixels, y, x, 1)
+								radius.ApplyAdaptiveFilter()
+								frameCopy[y][x] = radius.Pixels[radius.CenterY][radius.CenterX]
+							}
+						}
+						frame.Pixels = frameCopy
+					}
+
 					filaFramesProcessados <- frame
 				}
 			}()
