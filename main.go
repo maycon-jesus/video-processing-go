@@ -139,15 +139,17 @@ func main() {
 						frameCopy[y] = make([]uint8, largura)
 					}
 
-					for y, row := range frame.Pixels {
-						for x := range row {
-							radius := internal.GetPixelRadius(frame.Pixels, y, x, 1)
-							radius.ApplyMedianMask()
-							frameCopy[y][x] = radius.Pixels[radius.CenterY][radius.CenterX]
+					for range 10 {
+						for y, row := range frame.Pixels {
+							for x := range row {
+								radius := internal.GetPixelRadius(frame.Pixels, y, x, 1)
+								radius.ApplyAdaptiveFilter()
+								frameCopy[y][x] = radius.Pixels[radius.CenterY][radius.CenterX]
+							}
 						}
+						frame.Pixels = frameCopy
 					}
 
-					frame.Pixels = frameCopy
 					filaFramesProcessados <- frame
 				}
 			}()
@@ -162,7 +164,7 @@ func main() {
 	close(filaFramesProcessados)
 
 	for frameId := range len(pixels) {
-		// internal.TimeTravaler(pixels, frameId, 23)
+		internal.TimeTravaler(pixels, frameId, 7)
 		fmt.Println("Frame ", frameId)
 	}
 
