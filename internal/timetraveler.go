@@ -7,21 +7,27 @@ import (
 	"sync"
 )
 
+// median calcula a mediana de um slice de uint8.
 func median(values []uint8) uint8 {
-	sort.Slice(values, func(i, j int) bool {
-		return values[i] < values[j]
+	// Cria uma cópia para não modificar o slice original.
+	sortedValues := make([]uint8, len(values))
+	copy(sortedValues, values)
+	sort.Slice(sortedValues, func(i, j int) bool {
+		return sortedValues[i] < sortedValues[j]
 	})
-	mid := len(values) / 2
-	return values[mid]
+	mid := len(sortedValues) / 2
+	return sortedValues[mid]
 }
 
+// isEdgePixel verifica se um pixel é uma borda usando o operador Sobel.
 func isEdgePixel(videoFrames VideoFrames, currentFrame, line, pixel int) bool {
 	frame := videoFrames[currentFrame]
+	// Verifica se o pixel está nas bordas do frame.
 	if line == 0 || line >= len(frame)-1 || pixel == 0 || pixel >= len(frame[line])-1 {
 		return true
 	}
 
-	// Usar operador Sobel para melhor detecção de bordas
+	// Operador Sobel para detecção de bordas.
 	gx := float64(-int(frame[line-1][pixel-1]) + int(frame[line-1][pixel+1]) +
 		-2*int(frame[line][pixel-1]) + 2*int(frame[line][pixel+1]) +
 		-int(frame[line+1][pixel-1]) + int(frame[line+1][pixel+1]))
@@ -30,16 +36,16 @@ func isEdgePixel(videoFrames VideoFrames, currentFrame, line, pixel int) bool {
 		int(frame[line+1][pixel-1]) + 2*int(frame[line+1][pixel]) + int(frame[line+1][pixel+1]))
 
 	gradient := math.Sqrt(gx*gx + gy*gy)
-	return gradient > 25 // Threshold ajustado para P&B
+	// Define um limiar para considerar como borda.
+	return gradient > 25
 }
 
-// Detecta borrões (valores muito baixos anômalos)
+// isBlur verifica se o pixel atual está borrado em comparação com os valores anteriores.
 func isBlur(values []uint8, current uint8) bool {
 	if len(values) < 3 {
 		return false
 	}
 
-	// Calcular mediana dos valores históricos
 	sorted := make([]uint8, len(values))
 	copy(sorted, values)
 	sort.Slice(sorted, func(i, j int) bool {
@@ -47,18 +53,17 @@ func isBlur(values []uint8, current uint8) bool {
 	})
 	median := sorted[len(sorted)/2]
 
-	// Se o valor atual é muito mais escuro que a mediana, pode ser borrão
 	diff := int(median) - int(current)
-	return diff > 40 && current < 60 // Valor muito escuro comparado ao histórico
+	// Condições para identificar blur: diferença significativa e valor atual baixo.
+	return diff > 40 && current < 60
 }
 
-// Detecta clarões (valores muito altos anômalos)
+// isFlare verifica se o pixel atual é um reflexo (flare) em comparação com os valores anteriores.
 func isFlare(values []uint8, current uint8) bool {
 	if len(values) < 3 {
 		return false
 	}
 
-	// Calcular mediana dos valores históricos
 	sorted := make([]uint8, len(values))
 	copy(sorted, values)
 	sort.Slice(sorted, func(i, j int) bool {
@@ -66,20 +71,21 @@ func isFlare(values []uint8, current uint8) bool {
 	})
 	median := sorted[len(sorted)/2]
 
-	// Se o valor atual é muito mais claro que a mediana, pode ser clarão
 	diff := int(current) - int(median)
-	return diff > 50 && current > 180 // Valor muito claro comparado ao histórico
+	// Condições para identificar flare: diferença significativa e valor atual alto.
+	return diff > 50 && current > 180
 }
 
+// isNoise verifica se o pixel atual é ruído em comparação com os valores anteriores.
 func isNoise(values []uint8, current uint8, variance float64) bool {
 	if len(values) < 3 {
 		return false
 	}
 
-	// Contar quantos valores históricos são similares entre si
 	similarCount := 0
-	threshold := uint8(5) // Aumentado para melhor detecção
+	threshold := uint8(5) // Limiar para considerar pixels como similares.
 
+	// Conta pares de pixels com valores próximos.
 	for i := 0; i < len(values)-1; i++ {
 		for j := i + 1; j < len(values); j++ {
 			diff := int(values[i]) - int(values[j])
@@ -92,45 +98,50 @@ func isNoise(values []uint8, current uint8, variance float64) bool {
 		}
 	}
 
-	// Se a maioria dos valores históricos são similares,
-	// mas o atual é muito diferente, provavelmente é ruído
 	totalPairs := len(values) * (len(values) - 1) / 2
 	stabilityRatio := float64(similarCount) / float64(totalPairs)
 
-	if stabilityRatio > 0.6 { // 60% dos valores históricos são estáveis
-		// Verificar se o valor atual destoa
-		sort.Slice(values, func(i, j int) bool {
-			return values[i] < values[j]
+	// Se a maioria dos pixels anteriores forem estáveis (similares),
+	// verifica se o pixel atual destoa muito da mediana.
+	if stabilityRatio > 0.6 {
+		// Cria uma cópia para não modificar o slice original.
+		sortedValues := make([]uint8, len(values))
+		copy(sortedValues, values)
+		sort.Slice(sortedValues, func(i, j int) bool {
+			return sortedValues[i] < sortedValues[j]
 		})
-		median := values[len(values)/2]
+		median := sortedValues[len(sortedValues)/2]
 
 		currentDiff := int(current) - int(median)
 		if currentDiff < 0 {
 			currentDiff = -currentDiff
 		}
 
-		return uint8(currentDiff) > 12 // Aumentado para melhor detecção
+		return uint8(currentDiff) > 12 // Limiar para considerar como ruído.
 	}
 
 	return false
 }
 
-// Verifica se a região tem movimento significativo
+// hasMovement verifica se há movimento significativo nos valores dos pixels anteriores.
 func hasMovement(values []uint8) bool {
 	if len(values) < 3 {
 		return false
 	}
 
 	variance := calculateVariance(values)
-	return variance > 30 // Threshold para detectar movimento
+	// Limiar de variância para detectar movimento.
+	return variance > 30
 }
 
-// Filtro adaptativo baseado na análise temporal
+// adaptiveTemporalFilter aplica um filtro temporal adaptativo.
+// A intensidade do filtro (alpha) depende da variância dos pixels anteriores.
 func adaptiveTemporalFilter(values []uint8, current uint8, variance float64) uint8 {
 	if len(values) == 0 {
 		return current
 	}
 
+	// Cria uma cópia para não modificar o slice original.
 	sorted := make([]uint8, len(values))
 	copy(sorted, values)
 	sort.Slice(sorted, func(i, j int) bool {
@@ -139,18 +150,20 @@ func adaptiveTemporalFilter(values []uint8, current uint8, variance float64) uin
 
 	median := sorted[len(sorted)/2]
 
-	// Escolher alpha baseado na estabilidade da região
 	var alpha float64
+	// Ajusta o peso (alpha) com base na variância.
+	// Menor variância = maior peso para a mediana dos frames anteriores.
 	if variance < 10 {
-		alpha = 0.6 // Região muito estável - filtro mais forte
+		alpha = 0.6
 	} else if variance < 25 {
-		alpha = 0.4 // Região moderadamente estável
+		alpha = 0.4
 	} else {
-		alpha = 0.2 // Região com movimento - filtro suave
+		alpha = 0.2
 	}
 
 	result := alpha*float64(median) + (1-alpha)*float64(current)
 
+	// Garante que o resultado esteja no intervalo [0, 255].
 	if result < 0 {
 		return 0
 	}
@@ -161,81 +174,65 @@ func adaptiveTemporalFilter(values []uint8, current uint8, variance float64) uin
 	return uint8(result)
 }
 
+// TimeTravalerProcessLine processa uma única linha de um frame de vídeo.
+// Aplica diferentes técnicas de filtragem temporal baseadas na análise dos pixels.
 func TimeTravalerProcessLine(videoFrames VideoFrames, currentFrame int, previousFrames int, line int) []uint8 {
+	// Não processa os primeiros frames, pois não há frames anteriores suficientes.
 	if currentFrame <= 2 {
 		return videoFrames[currentFrame][line]
 	}
 
 	lineWidth := len(videoFrames[currentFrame][line])
-	nLine := make([]uint8, lineWidth)
-	tempValues := make([]uint8, previousFrames)
+	nLine := make([]uint8, lineWidth)           // Linha processada.
+	tempValues := make([]uint8, previousFrames) // Valores do pixel atual nos frames anteriores.
 	frameStart := currentFrame - previousFrames
 
 	for i := 0; i < lineWidth; i++ {
-		current := videoFrames[currentFrame][line][i]
+		current := videoFrames[currentFrame][line][i] // Pixel atual.
 
-		// Se for uma borda, preserve o pixel original
+		// Se for um pixel de borda, mantém o valor original.
 		if isEdgePixel(videoFrames, currentFrame, line, i) {
 			nLine[i] = current
 			continue
 		}
 
-		// Coletar valores históricos
+		// Coleta os valores do pixel atual nos frames anteriores.
 		for j := 0; j < previousFrames; j++ {
 			tempValues[j] = videoFrames[frameStart+j][line][i]
 		}
 
-		variance := calculateVariance(tempValues)
+		variance := calculateVariance(tempValues) // Calcula a variância dos pixels anteriores.
 
-		// Detectar e corrigir borrões
+		// Aplica diferentes filtros com base nas características detectadas.
 		if isBlur(tempValues, current) {
-			// Usar mediana dos valores históricos mais estáveis
+			// Correção para blur: usa a média da mediana e do próximo valor ordenado.
 			sorted := make([]uint8, len(tempValues))
 			copy(sorted, tempValues)
 			sort.Slice(sorted, func(i, j int) bool {
 				return sorted[i] < sorted[j]
 			})
 
-			// Usar um valor ligeiramente acima da mediana para corrigir borrão
 			medianIdx := len(sorted) / 2
 			correctedValue := sorted[medianIdx]
 			if medianIdx < len(sorted)-1 {
 				correctedValue = uint8((int(sorted[medianIdx]) + int(sorted[medianIdx+1])) / 2)
 			}
 
-			alpha := 0.8 // Correção agressiva para borrões
-			nLine[i] = uint8(alpha*float64(correctedValue) + (1-alpha)*float64(current))
-
-		} else if isFlare(tempValues, current) {
-			// Corrigir clarões usando valores históricos mais escuros
-			sorted := make([]uint8, len(tempValues))
-			copy(sorted, tempValues)
-			sort.Slice(sorted, func(i, j int) bool {
-				return sorted[i] < sorted[j]
-			})
-
-			// Usar um valor ligeiramente abaixo da mediana para corrigir clarão
-			medianIdx := len(sorted) / 2
-			correctedValue := sorted[medianIdx]
-			if medianIdx > 0 {
-				correctedValue = uint8((int(sorted[medianIdx]) + int(sorted[medianIdx-1])) / 2)
-			}
-
-			alpha := 0.8 // Correção agressiva para clarões
+			alpha := 0.8 // Peso para a correção.
 			nLine[i] = uint8(alpha*float64(correctedValue) + (1-alpha)*float64(current))
 
 		} else if isNoise(tempValues, current, variance) {
-			// Ruído detectado - usar mediana
-			median := median(tempValues)
-			alpha := 0.7
-			nLine[i] = uint8(alpha*float64(median) + (1-alpha)*float64(current))
+			// Correção para ruído: usa a mediana dos frames anteriores.
+			medianVal := median(tempValues)
+			alpha := 0.7 // Peso para a correção.
+			nLine[i] = uint8(alpha*float64(medianVal) + (1-alpha)*float64(current))
 
 		} else if variance < 20 && !hasMovement(tempValues) {
-			// Região estável - aplicar filtro temporal adaptativo
+			// Se há baixa variância e pouco movimento, aplica filtro temporal adaptativo.
 			nLine[i] = adaptiveTemporalFilter(tempValues, current, variance)
 
 		} else {
-			// Região com movimento significativo - preservar
+			// Caso contrário, mantém o pixel original.
 			nLine[i] = current
 		}
 	}
@@ -243,6 +240,7 @@ func TimeTravalerProcessLine(videoFrames VideoFrames, currentFrame int, previous
 	return nLine
 }
 
+// calculateVariance calcula a variância de um slice de uint8.
 func calculateVariance(values []uint8) float64 {
 	if len(values) <= 1 {
 		return 0
@@ -256,10 +254,13 @@ func calculateVariance(values []uint8) float64 {
 	}
 
 	mean := sum / float64(len(values))
+	// Fórmula da variância: E[X^2] - (E[X])^2
 	return (sumSq / float64(len(values))) - (mean * mean)
 }
 
+// TimeTravaler processa um frame de vídeo completo, aplicando o filtro temporal em paralelo por linha.
 func TimeTravaler(videoFrames VideoFrames, currentFrame int, previousFrames int) {
+	// Não processa se não houver frames anteriores suficientes.
 	if currentFrame <= previousFrames-1 {
 		return
 	}
@@ -267,13 +268,12 @@ func TimeTravaler(videoFrames VideoFrames, currentFrame int, previousFrames int)
 	frame := videoFrames[currentFrame]
 	totalLines := len(frame)
 
-	// Use número de CPUs disponíveis
-	numWorkers := runtime.NumCPU()
+	numWorkers := runtime.NumCPU() // Usa o número de CPUs disponíveis como workers.
 
 	var wg sync.WaitGroup
-	lineChan := make(chan int, totalLines)
+	lineChan := make(chan int, totalLines) // Canal para distribuir as linhas entre os workers.
 
-	// Envia índices das linhas
+	// Goroutine para popular o canal com os índices das linhas.
 	go func() {
 		for i := 0; i < totalLines; i++ {
 			lineChan <- i
@@ -281,17 +281,18 @@ func TimeTravaler(videoFrames VideoFrames, currentFrame int, previousFrames int)
 		close(lineChan)
 	}()
 
-	// Workers processam linhas
+	// Inicia os workers.
 	for i := 0; i < numWorkers; i++ {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
+			// Cada worker processa linhas do canal até que o canal seja fechado.
 			for lineIdx := range lineChan {
 				processedLine := TimeTravalerProcessLine(videoFrames, currentFrame, previousFrames, lineIdx)
-				frame[lineIdx] = processedLine
+				frame[lineIdx] = processedLine // Atualiza a linha no frame original.
 			}
 		}()
 	}
 
-	wg.Wait()
+	wg.Wait() // Espera todos os workers terminarem.
 }
