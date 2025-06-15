@@ -263,31 +263,3 @@ func (p PixelsRadius) applySoftFilter(neighbors []uint8, current uint8, alpha fl
 
 	return uint8(result)
 }
-
-// Função de conveniência para aplicar filtro com configuração otimizada para P&B
-func (p PixelsRadius) ApplyDenoiseFilter() {
-	p.ApplyAdaptiveFilter()
-}
-
-// Versão legada mantida para compatibilidade
-func (p PixelsRadius) ApplyMedianMask() {
-	if p.IsEdgePixel(20.0) {
-		return
-	}
-
-	sum := 0
-	pixelsCount := 0
-	for y, row := range p.Pixels {
-		for x, pixelValue := range row {
-			if y == p.CenterY && x == p.CenterX {
-				continue
-			}
-			sum += int(pixelValue)
-			pixelsCount++
-		}
-	}
-
-	if pixelsCount > 0 {
-		p.Pixels[p.CenterY][p.CenterX] = uint8(sum / pixelsCount)
-	}
-}
