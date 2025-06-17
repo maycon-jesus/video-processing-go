@@ -2,7 +2,7 @@ up:
 	docker compose up
 down:
 	docker compose down
-dev:
+open:
 	docker exec -it video-processing-go-app-1 bash
 
 # Test targets
