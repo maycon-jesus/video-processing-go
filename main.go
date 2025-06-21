@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"video-processor/internal"
 
@@ -93,6 +94,10 @@ func gravarVideo(frames [][][]uint8, caminho string, fps float64) {
 }
 
 func main() {
+	threads := flag.Int("threads", 22, "Número de threads para processamento")
+	flag.Parse()
+	fmt.Println("Iniciando processamento de vídeo com", *threads, "threads")
+
 	fmt.Println("ola mundo")
 	caminhoVideo := "./videos/video.mp4"
 	caminhoSaida := "./videos/video2.mp4"
@@ -123,7 +128,7 @@ func main() {
 	}()
 
 	go func() {
-		for range 22 {
+		for range *threads {
 			go func() {
 				for {
 					frame, ok := <-filaProcessamento
@@ -164,7 +169,7 @@ func main() {
 	close(filaFramesProcessados)
 
 	for frameId := range len(pixels) {
-		internal.TimeTravaler(pixels, frameId, 7)
+		internal.TimeTravaler(pixels, frameId, 7, *threads)
 		fmt.Println("Frame ", frameId)
 	}
 

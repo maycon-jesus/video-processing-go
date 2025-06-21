@@ -235,7 +235,7 @@ func TestApplyChanges_Performance(t *testing.T) {
 	t.Run("Large number of changes", func(t *testing.T) {
 		// Create a larger frame for performance testing
 		frame := createTestFrameForConstructor(100, 100, 128)
-		
+
 		// Create many pixel radius changes
 		var pixelsRadius []PixelsRadius
 		for y := 0; y < 100; y += 5 {
@@ -275,7 +275,7 @@ func BenchmarkApplyChanges(b *testing.B) {
 			frameCopy[j] = make([]uint8, len(frame[j]))
 			copy(frameCopy[j], frame[j])
 		}
-		
+
 		ApplyChanges(frameCopy, pixelsRadius)
 	}
 }

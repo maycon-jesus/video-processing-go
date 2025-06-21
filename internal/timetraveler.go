@@ -2,7 +2,6 @@ package internal
 
 import (
 	"math"
-	"runtime"
 	"sort"
 	"sync"
 )
@@ -259,7 +258,7 @@ func calculateVariance(values []uint8) float64 {
 }
 
 // TimeTravaler processa um frame de vídeo completo, aplicando o filtro temporal em paralelo por linha.
-func TimeTravaler(videoFrames VideoFrames, currentFrame int, previousFrames int) {
+func TimeTravaler(videoFrames VideoFrames, currentFrame int, previousFrames int, threads int) {
 	// Não processa se não houver frames anteriores suficientes.
 	if currentFrame <= previousFrames-1 {
 		return
@@ -268,7 +267,7 @@ func TimeTravaler(videoFrames VideoFrames, currentFrame int, previousFrames int)
 	frame := videoFrames[currentFrame]
 	totalLines := len(frame)
 
-	numWorkers := runtime.NumCPU() // Usa o número de CPUs disponíveis como workers.
+	numWorkers := threads // Usa o número de threads especificado como workers.
 
 	var wg sync.WaitGroup
 	lineChan := make(chan int, totalLines) // Canal para distribuir as linhas entre os workers.
